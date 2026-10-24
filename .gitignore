@@ -1,0 +1,18 @@
+# Simulacion (iverilog / GTKWave)
+*.vcd
+sim_*
+
+# Sintesis y bitstreams (se generan en la Pi o con yosys)
+build/
+build_top.v
+*.bit
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+venv/
