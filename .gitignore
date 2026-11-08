@@ -5,7 +5,10 @@ sim_*
 # Sintesis y bitstreams (se generan en la Pi o con yosys)
 build/
 build_top.v
+build_apio/
 *.bit
+# excepcion: los .bit de prueba que se compilan en la laptop (hacer_bit.py) para la Pi
+!bits/*.bit
 
 # Python
 __pycache__/
