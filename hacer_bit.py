@@ -14,6 +14,7 @@ Despues:
 En la Pi (Levi):
     git pull && openFPGALoader -b cmoda7_35t bits/<nombre>.bit
 """
+import os
 import shutil
 import subprocess
 import sys
@@ -73,7 +74,10 @@ def main():
     print(f"Proyecto apio en {proyecto.relative_to(RAIZ)}: {', '.join(Path(f).name for f in fuentes)} + {xdc}")
 
     print("Compilando con apio (la primera vez descarga la toolchain y tarda unos minutos)...")
-    r = subprocess.run([*comando_apio(), "build"], cwd=proyecto)
+    # YOSYS_MAX_THREADS=1: el yosys de apio en Windows se cae (std::system_error Invalid argument)
+    # cuando reparte el trabajo en hilos, cosa que hace con disenos de mas de ~1000 celdas (paso7).
+    entorno = {**os.environ, "YOSYS_MAX_THREADS": "1"}
+    r = subprocess.run([*comando_apio(), "build"], cwd=proyecto, env=entorno)
     if r.returncode != 0:
         error("apio build fallo (mira el mensaje de arriba). Si faltan paquetes: apio packages install")
 
