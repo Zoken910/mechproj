@@ -1,6 +1,5 @@
-# cmod_a7.xdc: pines del LED parpadeante (Paso 3).
-# Numeros tomados de Cmod-A7-Master.xdc de Digilent. En el Paso 9.4 este archivo
-# se reemplaza por el XDC completo (UART, ADC, DAC, SPI).
+# cmod_paso3.xdc: pines del LED parpadeante (Paso 3), para rtl/top.v.
+# Numeros tomados de Cmod-A7-Master.xdc de Digilent. El XDC completo es rtl/cmod_a7.xdc.
 
 # Reloj de 12 MHz
 set_property PACKAGE_PIN L17 [get_ports clk]
