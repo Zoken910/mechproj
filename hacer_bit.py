@@ -31,6 +31,10 @@ APIO_INI = """[env:default]
 board = cmod-a7-35t
 top-module = top
 constraint-file = pines.xdc
+; todo en un solo modulo antes de optimizar (como build.sh en la Pi). Sin esto, el yosys de
+; apio en Windows se cae con varios modulos: std::system_error Invalid argument
+yosys-extra-options =
+    -flatten
 """
 
 
