@@ -2,12 +2,17 @@
 # build.sh: Verilog -> bitstream -> CMOD-A7 con la toolchain abierta (yosys + openXC7).
 # Version corregida del 08.11.2026: el XDC se elige al llamar, revisa todo antes de empezar
 # y, si un paso falla, dice cual y muestra el error (antes solo faltaba el .bit al final).
+# 17.11.2026: usa OSS CAD Suite de ~/oss-cad-suite si yosys no esta en el PATH, anota las
+# versiones de las herramientas en build/versiones.txt y agrega el top del paso 9.
+# Para instalar o actualizar OSS CAD Suite: ./tools/actualizar_oss_cad_suite.sh
 #
 # Uso (desde la carpeta principal del repo):
 #   XDC=rtl/paso3/cmod_paso3.xdc ./build.sh rtl/top.v
-#   XDC=rtl/paso5/cmod_paso5.xdc ./build.sh rtl/paso5/top_paso5.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v
-#   XDC=rtl/paso7/cmod_paso7.xdc ./build.sh rtl/paso7/top_paso7.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v rtl/blocks/adc_ad7606.v rtl/blocks/dac_pmodda2.v
+#   XDC=rtl/paso5/cmod_paso5.xdc ./build.sh rtl/paso5/top_paso5.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v rtl/blocks/uart_parser.v rtl/blocks/registros.v
+#   XDC=rtl/paso7/cmod_paso7.xdc ./build.sh rtl/paso7/top_paso7.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v rtl/blocks/uart_parser.v rtl/blocks/registros.v rtl/blocks/adc_ad7606.v rtl/blocks/dac_pmodda2.v
+#   ./build.sh rtl/top_template.v rtl/paso9/cadena_paso9.v rtl/blocks/*.v      (paso 9: lazo PID, huella 0x0009)
 # Sin XDC=... usa rtl/cmod_a7.xdc (la tabla de pines completa, para el top final).
+# (desde el 17.11 regs_uart.v necesita uart_parser.v y registros.v: son los bloques que pidio el profe)
 # SIN_CARGAR=1 ./build.sh ...   solo compila, no carga la FPGA.
 # El resultado queda en build/top.bit y los registros de cada paso en build/*.log.
 
@@ -22,11 +27,18 @@ falla() { echo; echo "ERROR: $1"; exit 1; }
 muestra_log() { echo "--- ultimas lineas de $1 ---"; tail -n 25 "$1"; }
 
 # ---- revisar todo antes de empezar ----
+# OSS CAD Suite: si yosys no esta en el PATH, usar la de ~/oss-cad-suite (solo bin/, sin cambiar
+# python3: fasm2frames de openXC7 necesita el python3 del sistema)
+OSS=${OSS_CAD_SUITE:-$HOME/oss-cad-suite}
+if ! command -v yosys >/dev/null && [ -x "$OSS/bin/yosys" ]; then
+    export PATH="$OSS/bin:$PATH"
+    echo "OSS CAD Suite: $OSS/bin agregado al PATH"
+fi
 [ $# -ge 1 ] || falla "faltan los archivos .v. Ejemplo: XDC=rtl/paso3/cmod_paso3.xdc ./build.sh rtl/top.v"
 for f in "$@"; do [ -f "$f" ] || falla "no existe $f (git pull hecho? estas en la carpeta del repo?)"; done
 [ -f "$XDC" ] || falla "no existe el XDC $XDC"
 for t in yosys nextpnr-xilinx fasm2frames xc7frames2bit openFPGALoader; do
-    command -v "$t" >/dev/null || falla "no se encuentra $t (falta 'source ~/oss-cad-suite/environment' o la instalacion de openXC7)"
+    command -v "$t" >/dev/null || falla "no se encuentra $t (yosys y openFPGALoader: ./tools/actualizar_oss_cad_suite.sh; nextpnr-xilinx, fasm2frames y xc7frames2bit: la instalacion de openXC7)"
 done
 [ -f "$CHIPDB" ] || falla "no existe la chipdb $CHIPDB. Pon la ruta real: export CHIPDB=/ruta/a/xc7a35tcpg236-1.bin"
 [ -n "${PRJXRAY_DB_DIR:-}" ] || falla "PRJXRAY_DB_DIR no esta definida (la define la instalacion de openXC7; revisa ~/.bashrc)"
@@ -36,6 +48,13 @@ echo "XDC: $XDC"
 echo "Archivos: $*"
 mkdir -p "$OUT"
 rm -f "$OUT/top.json" "$OUT/top.fasm" "$OUT/top.frames" "$OUT/top.bit"
+{   # que version de cada herramienta hizo este .bit (sirve para comparar si algo cambia)
+    date
+    echo "yosys:          $(yosys -V 2>&1 | head -1)  ($(command -v yosys))"
+    echo "nextpnr-xilinx: $(nextpnr-xilinx --version 2>&1 | head -1)"
+    echo "openFPGALoader: $(openFPGALoader --Version 2>&1 | head -1)"
+} > "$OUT/versiones.txt"
+cat "$OUT/versiones.txt"
 
 # ---- 1) Sintesis: Verilog -> netlist ----
 paso "1/5 Sintesis (yosys)"
