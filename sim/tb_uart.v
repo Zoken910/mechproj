@@ -1,6 +1,9 @@
 // Prueba del Paso 5: la "Pi" escribe y lee todos los registros por UART.
 // Correr:
-//   iverilog -g2012 -o sim_uart sim/tb_uart.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v && vvp sim_uart
+//   iverilog -g2012 -o sim_uart sim/tb_uart.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v \
+//            rtl/blocks/uart_parser.v rtl/blocks/registros.v && vvp sim_uart
+// (desde el 17.11 regs_uart = uart_parser + registros; tambien prueba KI/KD y que el parser se
+//  recupera de un comando cortado)
 // Listo cuando: imprime ID = a7a7, KP = 0180 y "UART OK" (ninguna linea "UART MAL").
 // Supuesto del modelo de la Pi: 115200 baudios, 8N1, LSB primero (igual que pyserial).
 `timescale 1ns/1ps
@@ -14,7 +17,7 @@ module tb_uart;
     wire [7:0]  rx_data, tx_data;
     wire        rx_valid, tx_start, tx_busy;
     wire [15:0] control, dac1_manual, dac2_manual, setpoint, kp;
-    wire [15:0] gen_forma, gen_freq, gen_amp, gen_offset, usr_p1, usr_p2;
+    wire [15:0] gen_forma, gen_freq, gen_amp, gen_offset, usr_p1, usr_p2, ki, kd;
 
     // entradas de solo lectura con valores conocidos (ch0 en [15:0] ... ch7 en [127:112])
     reg [127:0] adc = {16'h8001, 16'h7FFF, 16'h0F0F, 16'hABCD,
@@ -30,7 +33,8 @@ module tb_uart;
                      .control(control), .dac1_manual(dac1_manual), .dac2_manual(dac2_manual),
                      .setpoint(setpoint), .kp(kp),
                      .gen_forma(gen_forma), .gen_freq(gen_freq), .gen_amp(gen_amp),
-                     .gen_offset(gen_offset), .usr_p1(usr_p1), .usr_p2(usr_p2));
+                     .gen_offset(gen_offset), .usr_p1(usr_p1), .usr_p2(usr_p2),
+                     .ki(ki), .kd(kd));
 
     // ---- la "Pi" manda: un byte en serie (inicio, 8 bits LSB primero, parada) ----
     task mandar(input [7:0] b);
@@ -92,18 +96,19 @@ module tb_uart;
         comprobar(8'h01, 16'd0);   comprobar(8'h02, 16'd0);   comprobar(8'h03, 16'd0);
         comprobar(8'h04, 16'd512); comprobar(8'h06, 16'd0);   comprobar(8'h07, 16'd14);
         comprobar(8'h08, 16'd256); comprobar(8'h09, 16'd512); comprobar(8'h0A, 16'd0);
-        comprobar(8'h0B, 16'd0);
+        comprobar(8'h0B, 16'd0);   comprobar(8'h0C, 16'd0);   comprobar(8'h0D, 16'd0);   // KI y KD del PID
 
         // 3) escribir todos los registros de escritura con valores distintos y leerlos de vuelta
         escribir(8'h01, 16'h0003); escribir(8'h02, 16'h0FFF); escribir(8'h03, 16'h0800);
         escribir(8'h04, 16'h0300); escribir(8'h06, 16'h0002); escribir(8'h07, 16'd1398);
         escribir(8'h08, 16'h0200); escribir(8'h09, 16'h0100); escribir(8'h0A, 16'hBEEF);
-        escribir(8'h0B, 16'h1234);
+        escribir(8'h0B, 16'h1234); escribir(8'h0C, 16'd2621); escribir(8'h0D, 16'd2560);
         comprobar(8'h01, 16'h0003); comprobar(8'h02, 16'h0FFF); comprobar(8'h03, 16'h0800);
         comprobar(8'h04, 16'h0300); comprobar(8'h05, 16'h0180); comprobar(8'h06, 16'h0002);
         comprobar(8'h07, 16'd1398); comprobar(8'h08, 16'h0200); comprobar(8'h09, 16'h0100);
-        comprobar(8'h0A, 16'hBEEF); comprobar(8'h0B, 16'h1234);
-        if (control !== 16'h0003 || gen_freq !== 16'd1398 || usr_p2 !== 16'h1234) begin
+        comprobar(8'h0A, 16'hBEEF); comprobar(8'h0B, 16'h1234); comprobar(8'h0C, 16'd2621);
+        comprobar(8'h0D, 16'd2560);
+        if (control !== 16'h0003 || gen_freq !== 16'd1398 || usr_p2 !== 16'h1234 || ki !== 16'd2621 || kd !== 16'd2560) begin
             $display("UART MAL: las salidas del bloque no coinciden con lo escrito"); errores = errores + 1;
         end
 
@@ -133,6 +138,15 @@ module tb_uart;
             $display("UART MAL: lectura partida, llego %h (esperado 00ff)", v); errores = errores + 1;
         end
         comprobar(8'h10, 16'h0100);                              // y la siguiente ya trae el nuevo
+
+        // 7) comando cortado (se pierde el ultimo byte de un 'W'): despues de 2 ms sin bytes el
+        //    parser vuelve a esperar un comando y la siguiente lectura sale bien.
+        mandar("W"); mandar(8'h05); mandar(8'h7F);             // falta el byte bajo
+        #3_000_000;                                              // 3 ms en silencio
+        comprobar(8'h05, 16'h0180);                              // KP sin cambios y respuesta correcta
+        // 8) un comando lento pero entero (0.5 ms entre bytes) se sigue aceptando
+        mandar("W"); #500_000; mandar(8'h05); #500_000; mandar(8'h01); #500_000; mandar(8'h23);
+        comprobar(8'h05, 16'h0123);
 
         if (errores == 0) $display("UART OK");
         else              $display("UART MAL: %0d errores", errores);

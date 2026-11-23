@@ -1,6 +1,7 @@
 // Prueba de top_paso7.v completo: la "Pi" escribe por UART y el DAC saca el valor.
 // Correr:
-//   iverilog -g2012 -o sim_paso7 sim/tb_paso7.v sim/modelo_dac121s101.v rtl/paso7/top_paso7.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v rtl/blocks/adc_ad7606.v rtl/blocks/dac_pmodda2.v && vvp sim_paso7
+//   iverilog -g2012 -o sim_paso7 sim/tb_paso7.v sim/modelo_dac121s101.v rtl/paso7/top_paso7.v rtl/blocks/uart_rx.v rtl/blocks/uart_tx.v rtl/blocks/regs_uart.v \
+//            rtl/blocks/uart_parser.v rtl/blocks/registros.v rtl/blocks/adc_ad7606.v rtl/blocks/dac_pmodda2.v && vvp sim_paso7
 // Listo cuando: imprime "PASO7 OK". Es lo mismo que hace pi/prueba_dac.py en la placa.
 `timescale 1ns/1ps
 module tb_paso7;

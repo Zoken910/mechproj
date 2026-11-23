@@ -9,6 +9,7 @@ Uso (desde la carpeta principal del repo):
     python hacer_bit.py blinky     # rtl/top.v + rtl/paso3/cmod_paso3.xdc
     python hacer_bit.py paso5      # UART + registros
     python hacer_bit.py paso7      # UART + registros + ADC + DAC
+    python hacer_bit.py paso9      # top final + cadena de velocidad con el PID (huella 0x0009)
 Despues:
     git add bits/<nombre>.bit && git commit -m "bit de <nombre>" && git push
 En la Pi (Levi):
@@ -21,12 +22,21 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
-UART = ["rtl/blocks/uart_rx.v", "rtl/blocks/uart_tx.v", "rtl/blocks/regs_uart.v"]
+UART = ["rtl/blocks/uart_rx.v", "rtl/blocks/uart_tx.v", "rtl/blocks/regs_uart.v",
+        "rtl/blocks/uart_parser.v", "rtl/blocks/registros.v"]   # regs_uart = parser + registros
 PRUEBAS = {
     "blinky": ("rtl/paso3/cmod_paso3.xdc", ["rtl/top.v"]),
     "paso5": ("rtl/paso5/cmod_paso5.xdc", ["rtl/paso5/top_paso5.v", *UART]),
     "paso7": ("rtl/paso7/cmod_paso7.xdc", ["rtl/paso7/top_paso7.v", *UART,
                                            "rtl/blocks/adc_ad7606.v", "rtl/blocks/dac_pmodda2.v"]),
+    # paso 9: el top final (uart parser + register separados) con la cadena de velocidad a mano
+    "paso9": ("rtl/cmod_a7.xdc", ["rtl/top_template.v", "rtl/paso9/cadena_paso9.v",
+                                  "rtl/blocks/uart_rx.v", "rtl/blocks/uart_tx.v",
+                                  "rtl/blocks/uart_parser.v", "rtl/blocks/registros.v",
+                                  "rtl/blocks/adc_ad7606.v", "rtl/blocks/dac_pmodda2.v",
+                                  "rtl/blocks/spi_stream.v", "rtl/blocks/sigma_delta.v",
+                                  "rtl/blocks/v_fpga_fpt2p16_2o_sdm.v",
+                                  "rtl/blocks/filtro_media.v", "rtl/blocks/control_pid.v"]),
 }
 APIO_INI = """[env:default]
 board = cmod-a7-35t
